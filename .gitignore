@@ -1,0 +1,57 @@
+# ── Virtual Environments ───────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Python Cache ───────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── IDE ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment Variables ──────────────────────
+.env
+
+# ── Generated Outputs ─────────────────────────
+data/outputs/
+
+# ── Model Weights ─────────────────────────────
+*.pt
+*.onnx
+*.engine
+*.torchscript
+weights/
+
+# ── Temporary Videos & Large Files ─────────────
+*.mp4
+*.avi
+*.mov
+*.mkv
+!data/samples/*.mp4
+!data/samples/*.avi
+
+# ── OS Files ───────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ───────────────────────────────────────
+*.log
+logs/
+
+# ── Jupyter ────────────────────────────────────
+.ipynb_checkpoints/
+
+#--- Task files ---
+Tasks/
