@@ -105,6 +105,24 @@ See `src/config.py` for available configuration options.
 
 ---
 
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Data Strategy](docs/data_strategy.md) | Accepted input formats, sample data sources, why COCO-pretrained detection is used, and what is explicitly excluded. |
+
+---
+
+## ⚠️ Prototype Disclaimer
+
+> **This project is a computer-vision research prototype and is NOT a production-grade ADAS
+> (Advanced Driver Assistance System) module.** It has not been validated against any
+> automotive safety standard (ISO 26262, SOTIF, etc.). Do not use it for real-world
+> safety-critical decisions. No dataset redistribution, personal-data collection, or
+> real-time safety guarantees are provided.
+
+---
+
 ## 📄 License
 
 This project is for educational / portfolio purposes.
