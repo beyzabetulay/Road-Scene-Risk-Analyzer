@@ -105,6 +105,24 @@ See `src/config.py` for available configuration options.
 
 ---
 
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/architecture.md) | Pipeline modules, data flow, configuration, and technology choices |
+| [Risk Model](docs/risk_model.md) | Heuristic scoring formula, thresholds, worked example, and limitations |
+
+---
+
+## ⚠️ Prototype Disclaimer
+
+> **This project is a computer-vision research prototype and is NOT a production-grade ADAS
+> (Advanced Driver Assistance System) module.** It has not been validated against any
+> automotive safety standard (ISO 26262, SOTIF, etc.). Do not use it for real-world
+> safety-critical decisions.
+
+---
+
 ## 📄 License
 
 This project is for educational / portfolio purposes.
