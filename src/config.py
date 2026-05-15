@@ -30,20 +30,9 @@ TARGET_CLASSES: list[str] = [
     "motorcycle",
     "bus",
     "truck",
-]
-
-# Optional classes — included when INCLUDE_OPTIONAL_CLASSES is set.
-OPTIONAL_CLASSES: list[str] = [
     "traffic light",
     "stop sign",
 ]
-
-INCLUDE_OPTIONAL_CLASSES: bool = (
-    os.getenv("INCLUDE_OPTIONAL_CLASSES", "false").lower() == "true"
-)
-
-if INCLUDE_OPTIONAL_CLASSES:
-    TARGET_CLASSES = TARGET_CLASSES + OPTIONAL_CLASSES
 
 # ── Risk Scoring ───────────────────────────────────────────────
 RISK_THRESHOLD_LOW: int = int(os.getenv("RISK_THRESHOLD_LOW", "35"))
