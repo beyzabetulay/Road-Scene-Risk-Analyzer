@@ -1,7 +1,7 @@
 """
-Road Scene Risk Analyzer — Image Analysis Pipeline
+Road Scene Risk Analyzer — Analysis Pipeline
 
-Orchestrates image loading → detection → result packaging.
+Orchestrates image/video loading → detection → result packaging.
 This module is UI-independent and can be used from tests, CLI, or Streamlit.
 """
 
@@ -15,10 +15,21 @@ from typing import Any, Union
 
 import numpy as np
 
-from src.config import CONFIDENCE_THRESHOLD, YOLO_MODEL
+from src.config import (
+    CONFIDENCE_THRESHOLD,
+    RISK_THRESHOLD_HIGH,
+    VIDEO_FRAME_STRIDE,
+    YOLO_MODEL,
+)
 from src.detection.detector import RoadDetector
 from src.detection.schemas import Detection
-from src.io.media_loader import ImageInput, load_image
+from src.io.media_loader import (
+    ImageInput,
+    VideoInfo,
+    get_video_info,
+    load_image,
+    load_video_frames,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -145,5 +156,168 @@ def analyze_image(
     logger.info(
         "Analysis complete: %d detection(s) found.",
         result.detection_count,
+    )
+    return result
+
+
+# ── Video analysis ──────────────────────────────────────────────
+
+
+@dataclass
+class VideoFrameResult:
+    """Detection result for a single processed video frame.
+
+    Attributes:
+        frame_index:     Original frame index in the video.
+        detections:      List of Detection objects for this frame.
+        detection_count: Number of detections in this frame.
+        max_risk_score:  Highest object-level risk score (0 before risk scoring).
+    """
+
+    frame_index: int
+    detections: list[Detection]
+    detection_count: int
+    max_risk_score: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a JSON-friendly dictionary."""
+        return asdict(self)
+
+
+@dataclass
+class VideoAnalysisResult:
+    """Aggregate result of analysing a video file.
+
+    Attributes:
+        video_info:          Metadata about the source video.
+        frame_stride:        How many frames were skipped between processed frames.
+        frame_results:       Per-frame detection results.
+        total_frames_read:   Total frames iterated (including skipped).
+        frames_processed:    Number of frames actually analysed.
+        max_scene_risk:      Highest per-frame max risk score across all frames.
+        avg_object_count:    Average number of detections per processed frame.
+        high_risk_frames:    Number of frames whose max risk score >= HIGH threshold.
+        riskiest_frame_index: Frame index with the highest max risk score (-1 if none).
+        timestamp:           ISO-8601 UTC timestamp of when the analysis completed.
+        settings:            Configuration values used for this run.
+    """
+
+    video_info: VideoInfo
+    frame_stride: int
+    frame_results: list[VideoFrameResult]
+    total_frames_read: int
+    frames_processed: int
+    max_scene_risk: float
+    avg_object_count: float
+    high_risk_frames: int
+    riskiest_frame_index: int
+    timestamp: str
+    settings: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the entire result to a JSON-friendly dictionary."""
+        return asdict(self)
+
+
+def analyze_video(
+    video_path: str | Path,
+    *,
+    stride: int = VIDEO_FRAME_STRIDE,
+    model_name: str = YOLO_MODEL,
+    confidence_threshold: float = CONFIDENCE_THRESHOLD,
+) -> VideoAnalysisResult:
+    """Run detection on every *stride*-th frame of a video.
+
+    Args:
+        video_path:           Path to ``.mp4`` or ``.avi`` file.
+        stride:               Process every N-th frame.
+        model_name:           YOLO model to use.
+        confidence_threshold: Minimum detection confidence.
+
+    Returns:
+        A :class:`VideoAnalysisResult` with per-frame results and
+        aggregate summary statistics.
+    """
+    video_path = Path(video_path)
+    info = get_video_info(video_path)
+
+    logger.info(
+        "Starting video analysis: %s (stride=%d)",
+        video_path.name,
+        stride,
+    )
+
+    detector = _get_detector(model_name, confidence_threshold)
+
+    frame_results: list[VideoFrameResult] = []
+    total_read = 0
+
+    for frame_idx, frame in load_video_frames(video_path, stride=stride):
+        total_read = frame_idx + 1
+        detections = detector.detect(frame)
+
+        # max risk score per frame (will be 0.0 until risk module is wired)
+        max_risk = (
+            max(d.risk_score for d in detections) if detections else 0.0
+        )
+
+        frame_results.append(
+            VideoFrameResult(
+                frame_index=frame_idx,
+                detections=detections,
+                detection_count=len(detections),
+                max_risk_score=max_risk,
+            )
+        )
+
+    # ── Aggregate summary ────────────────────────────────────────
+    frames_processed = len(frame_results)
+
+    if frames_processed > 0:
+        max_scene_risk = max(fr.max_risk_score for fr in frame_results)
+        avg_object_count = round(
+            sum(fr.detection_count for fr in frame_results) / frames_processed,
+            2,
+        )
+        high_risk_frames = sum(
+            1 for fr in frame_results
+            if fr.max_risk_score >= RISK_THRESHOLD_HIGH
+        )
+        riskiest_frame_index = max(
+            frame_results, key=lambda fr: fr.max_risk_score
+        ).frame_index
+    else:
+        max_scene_risk = 0.0
+        avg_object_count = 0.0
+        high_risk_frames = 0
+        riskiest_frame_index = -1
+
+    result = VideoAnalysisResult(
+        video_info=info,
+        frame_stride=stride,
+        frame_results=frame_results,
+        total_frames_read=total_read,
+        frames_processed=frames_processed,
+        max_scene_risk=max_scene_risk,
+        avg_object_count=avg_object_count,
+        high_risk_frames=high_risk_frames,
+        riskiest_frame_index=riskiest_frame_index,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        settings={
+            "model_name": model_name,
+            "confidence_threshold": confidence_threshold,
+            "frame_stride": stride,
+            "target_classes": list(detector.target_classes),
+        },
+    )
+
+    logger.info(
+        "Video analysis complete: %d/%d frames processed, "
+        "max_risk=%.1f, avg_objects=%.1f, high_risk_frames=%d",
+        frames_processed,
+        total_read,
+        max_scene_risk,
+        avg_object_count,
+        high_risk_frames,
     )
     return result
