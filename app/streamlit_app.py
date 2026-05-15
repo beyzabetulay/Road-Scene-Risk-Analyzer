@@ -31,6 +31,12 @@ from src.config import (
 from src.pipeline import analyze_image, analyze_video
 from src.risk.danger_zone import DangerZoneParams
 from src.visualization.annotator import annotate_image
+from src.io.exporters import (
+    export_image_to_bytes,
+    export_report_to_json,
+    export_table_to_csv,
+    generate_export_filename,
+)
 
 
 st.set_page_config(
@@ -184,7 +190,41 @@ if uploaded_file is not None:
                                 "Reason": d.risk_reason,
                             })
                         df = pd.DataFrame(df_data).sort_values("Risk Score", ascending=False)
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df)
+                        
+                    # ── Image Downloads ──
+                    st.subheader("💾 Export Results")
+                    dl_col1, dl_col2, dl_col3 = st.columns(3)
+                    
+                    # 1. Image
+                    img_bytes = export_image_to_bytes(annotated_bgr, ext=".png")
+                    img_name = generate_export_filename("annotated", result.scene_risk.risk_level, ".png")
+                    dl_col1.download_button(
+                        label="📷 Download Image",
+                        data=img_bytes,
+                        file_name=img_name,
+                        mime="image/png",
+                    )
+                    
+                    # 2. JSON
+                    json_str = export_report_to_json(result)
+                    json_name = generate_export_filename("report", result.scene_risk.risk_level, ".json")
+                    dl_col2.download_button(
+                        label="📄 Download JSON",
+                        data=json_str,
+                        file_name=json_name,
+                        mime="application/json",
+                    )
+                    
+                    # 3. CSV
+                    csv_str = export_table_to_csv(result)
+                    csv_name = generate_export_filename("detections", result.scene_risk.risk_level, ".csv")
+                    dl_col3.download_button(
+                        label="📊 Download CSV",
+                        data=csv_str,
+                        file_name=csv_name,
+                        mime="text/csv",
+                    )
                         
                 else:
                     # VIDEO ANALYSIS
@@ -257,6 +297,30 @@ if uploaded_file is not None:
                                 st.info(dummy_scene_risk.reason)
                             else:
                                 st.warning("Could not extract frame from video.")
+
+                    # ── Video Downloads ──
+                    st.subheader("💾 Export Results")
+                    dl_col1, dl_col2 = st.columns(2)
+                    
+                    # 1. JSON
+                    json_str = export_report_to_json(result)
+                    json_name = generate_export_filename("video_report", overall_risk_level, ".json")
+                    dl_col1.download_button(
+                        label="📄 Download Video JSON",
+                        data=json_str,
+                        file_name=json_name,
+                        mime="application/json",
+                    )
+                    
+                    # 2. CSV
+                    csv_str = export_table_to_csv(result)
+                    csv_name = generate_export_filename("video_detections", overall_risk_level, ".csv")
+                    dl_col2.download_button(
+                        label="📊 Download Video CSV",
+                        data=csv_str,
+                        file_name=csv_name,
+                        mime="text/csv",
+                    )
 
             except Exception as e:
                 st.error(f"Analysis failed: {str(e)}")
