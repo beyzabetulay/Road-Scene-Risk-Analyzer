@@ -99,6 +99,7 @@ def analyze_image(
     model_name: str = YOLO_MODEL,
     confidence_threshold: float = CONFIDENCE_THRESHOLD,
     source_name: str = "",
+    danger_zone_params: DangerZoneParams | None = None,
 ) -> AnalysisResult:
     """Run the full image analysis pipeline.
 
@@ -113,6 +114,7 @@ def analyze_image(
         model_name:           YOLO model to use (default from config).
         confidence_threshold: Minimum detection confidence (default from config).
         source_name:          Optional label for the input (e.g. filename).
+        danger_zone_params:   Optional danger zone parameters.
 
     Returns:
         An :class:`AnalysisResult` containing image metadata, detections,
@@ -143,8 +145,8 @@ def analyze_image(
     detections: list[Detection] = detector.detect(image)
 
     # Risk processing: Danger Zone ────────────────────────────────
-    from src.risk.danger_zone import DangerZone
-    zone = DangerZone(w, h)
+    from src.risk.danger_zone import DangerZone, DangerZoneParams
+    zone = DangerZone(w, h, params=danger_zone_params)
     
     updated_detections = []
     for d in detections:
@@ -248,6 +250,7 @@ def analyze_video(
     stride: int = VIDEO_FRAME_STRIDE,
     model_name: str = YOLO_MODEL,
     confidence_threshold: float = CONFIDENCE_THRESHOLD,
+    danger_zone_params: DangerZoneParams | None = None,
 ) -> VideoAnalysisResult:
     """Run detection on every *stride*-th frame of a video.
 
@@ -256,6 +259,7 @@ def analyze_video(
         stride:               Process every N-th frame.
         model_name:           YOLO model to use.
         confidence_threshold: Minimum detection confidence.
+        danger_zone_params:   Optional danger zone parameters.
 
     Returns:
         A :class:`VideoAnalysisResult` with per-frame results and
@@ -273,8 +277,8 @@ def analyze_video(
     detector = _get_detector(model_name, confidence_threshold)
     
     # Initialize DangerZone for the video resolution
-    from src.risk.danger_zone import DangerZone
-    zone = DangerZone(info.width, info.height)
+    from src.risk.danger_zone import DangerZone, DangerZoneParams
+    zone = DangerZone(info.width, info.height, params=danger_zone_params)
 
     frame_results: list[VideoFrameResult] = []
     total_read = 0
