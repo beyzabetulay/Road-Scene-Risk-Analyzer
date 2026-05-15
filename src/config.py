@@ -58,3 +58,6 @@ DANGER_ZONE_BOTTOM_LEFT: tuple[float, float] = (0.15, 0.95)
 # ── Accepted Media Formats ─────────────────────────────────────
 IMAGE_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS: set[str] = {".mp4", ".avi"}
+
+# ── Video Processing ───────────────────────────────────────────
+VIDEO_FRAME_STRIDE: int = int(os.getenv("VIDEO_FRAME_STRIDE", "10"))
