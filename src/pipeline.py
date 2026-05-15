@@ -31,6 +31,9 @@ from src.io.media_loader import (
     load_video_frames,
 )
 
+from src.risk.scene_classifier import SceneRiskResult, classify_scene
+from src.risk.scoring import calculate_object_risk, get_risk_reason
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +50,7 @@ class AnalysisResult:
         channels:      Number of colour channels (typically 3).
         detections:    List of :class:`Detection` objects found in the frame.
         detection_count: Number of detections (convenience field).
+        scene_risk:    Overall scene risk classification and summary.
         timestamp:     ISO-8601 UTC timestamp of when the analysis was run.
         settings:      Dictionary of configuration values used for this run.
         source_name:   Optional human-readable name for the input source.
@@ -57,6 +61,7 @@ class AnalysisResult:
     channels: int
     detections: list[Detection]
     detection_count: int
+    scene_risk: SceneRiskResult
     timestamp: str
     settings: dict[str, Any]
     source_name: str = ""
@@ -144,7 +149,14 @@ def analyze_image(
     updated_detections = []
     for d in detections:
         is_in_zone = zone.contains_point(d.bottom_center)
-        updated_detections.append(d.with_risk(in_danger_zone=is_in_zone))
+        temp_d = d.with_risk(in_danger_zone=is_in_zone)
+        score = calculate_object_risk(temp_d, h)
+        reason = get_risk_reason(temp_d)
+        updated_detections.append(
+            temp_d.with_risk(risk_score=score, risk_reason=reason)
+        )
+        
+    scene_risk = classify_scene(updated_detections)
     
     # 3. Package ──────────────────────────────────────────────────
     result = AnalysisResult(
@@ -153,6 +165,7 @@ def analyze_image(
         channels=c,
         detections=updated_detections,
         detection_count=len(updated_detections),
+        scene_risk=scene_risk,
         timestamp=datetime.now(timezone.utc).isoformat(),
         settings={
             "model_name": model_name,
@@ -186,7 +199,8 @@ class VideoFrameResult:
     frame_index: int
     detections: list[Detection]
     detection_count: int
-    max_risk_score: float = 0.0
+    max_risk_score: float
+    scene_risk_level: str
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-friendly dictionary."""
@@ -269,23 +283,26 @@ def analyze_video(
         total_read = frame_idx + 1
         detections = detector.detect(frame)
         
-        # Risk processing: Danger Zone
+        # Risk processing: Danger Zone and Scoring
         updated_detections = []
         for d in detections:
             is_in_zone = zone.contains_point(d.bottom_center)
-            updated_detections.append(d.with_risk(in_danger_zone=is_in_zone))
+            temp_d = d.with_risk(in_danger_zone=is_in_zone)
+            score = calculate_object_risk(temp_d, info.height)
+            reason = get_risk_reason(temp_d)
+            updated_detections.append(
+                temp_d.with_risk(risk_score=score, risk_reason=reason)
+            )
 
-        # max risk score per frame (will be 0.0 until risk module is wired)
-        max_risk = (
-            max(d.risk_score for d in updated_detections) if updated_detections else 0.0
-        )
+        scene_risk = classify_scene(updated_detections)
 
         frame_results.append(
             VideoFrameResult(
                 frame_index=frame_idx,
                 detections=updated_detections,
                 detection_count=len(updated_detections),
-                max_risk_score=max_risk,
+                max_risk_score=scene_risk.max_risk_score,
+                scene_risk_level=scene_risk.risk_level,
             )
         )
 
