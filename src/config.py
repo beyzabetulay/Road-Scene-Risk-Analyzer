@@ -23,15 +23,35 @@ YOLO_MODEL: str = os.getenv("YOLO_MODEL", "yolov8n.pt")
 CONFIDENCE_THRESHOLD: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.25"))
 
 # COCO class names that are relevant for road-scene risk analysis.
+# You can uncomment the items below to make the AI detect them.
 TARGET_CLASSES: list[str] = [
+    # ── High Priority (Moving Road Users) ──
     "person",
     "bicycle",
     "car",
     "motorcycle",
     "bus",
     "truck",
+    
+    # ── Static Road Infrastructure ──
     "traffic light",
     "stop sign",
+    # "fire hydrant",
+    # "parking meter",
+    # "bench",
+    
+    # ── Animals (Potential Road Hazards) ──
+    # "dog",
+    # "cat",
+    # "cow",
+    # "horse",
+    # "sheep",
+    # "bird",
+    
+    # ── Other Vehicles & Misc ──
+    # "train",
+    # "umbrella",
+    # "backpack",
 ]
 
 # ── Risk Scoring ───────────────────────────────────────────────
