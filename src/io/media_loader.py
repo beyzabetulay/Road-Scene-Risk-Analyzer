@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from src.config import IMAGE_EXTENSIONS
+from src.config import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, VIDEO_FRAME_STRIDE
 
 logger = logging.getLogger(__name__)
 
@@ -119,3 +119,156 @@ def _validate_array(arr: np.ndarray) -> np.ndarray:
             f"Expected a 3-channel image (H, W, 3), got shape {arr.shape}."
         )
     return arr
+
+
+# ── Video loading ───────────────────────────────────────────────
+
+from dataclasses import dataclass
+from typing import Generator
+
+
+class VideoLoadError(Exception):
+    """Raised when a video file cannot be opened or read."""
+
+
+@dataclass(frozen=True)
+class VideoInfo:
+    """Metadata extracted from a video file before frame iteration.
+
+    Attributes:
+        path:         Absolute path to the video file.
+        total_frames: Total number of frames reported by the codec.
+        fps:          Frames per second.
+        width:        Frame width in pixels.
+        height:       Frame height in pixels.
+        duration_s:   Approximate duration in seconds.
+    """
+
+    path: str
+    total_frames: int
+    fps: float
+    width: int
+    height: int
+    duration_s: float
+
+
+def get_video_info(video_path: str | Path) -> VideoInfo:
+    """Open a video file and return its metadata without reading frames.
+
+    Args:
+        video_path: Path to an ``.mp4`` or ``.avi`` file.
+
+    Returns:
+        A :class:`VideoInfo` with codec-reported metadata.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        UnsupportedFormatError: If the extension is not accepted.
+        VideoLoadError: If OpenCV cannot open the file.
+    """
+    path = Path(video_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Video not found: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        raise UnsupportedFormatError(
+            f"Unsupported video format '{suffix}'. "
+            f"Accepted: {', '.join(sorted(VIDEO_EXTENSIONS))}"
+        )
+
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        raise VideoLoadError(f"Failed to open video: {path}")
+
+    try:
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        duration_s = round(total_frames / fps, 2) if fps > 0 else 0.0
+    finally:
+        cap.release()
+
+    info = VideoInfo(
+        path=str(path.resolve()),
+        total_frames=total_frames,
+        fps=fps,
+        width=width,
+        height=height,
+        duration_s=duration_s,
+    )
+    logger.info(
+        "Video info: %s — %d frames, %.1f fps, %dx%d, %.1fs",
+        path.name,
+        total_frames,
+        fps,
+        width,
+        height,
+        duration_s,
+    )
+    return info
+
+
+def load_video_frames(
+    video_path: str | Path,
+    *,
+    stride: int = VIDEO_FRAME_STRIDE,
+) -> Generator[tuple[int, np.ndarray], None, None]:
+    """Yield ``(frame_index, bgr_array)`` tuples from a video file.
+
+    Only every *stride*-th frame is yielded to keep processing time
+    manageable.  Frames are read one at a time so the full video is
+    **never** loaded into memory.
+
+    Args:
+        video_path: Path to an ``.mp4`` or ``.avi`` file.
+        stride:     Process every *stride*-th frame (default from config).
+
+    Yields:
+        ``(frame_index, frame)`` where *frame* is a BGR ``np.ndarray``.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        UnsupportedFormatError: If the extension is not accepted.
+        VideoLoadError: If OpenCV cannot open the file.
+    """
+    path = Path(video_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Video not found: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        raise UnsupportedFormatError(
+            f"Unsupported video format '{suffix}'. "
+            f"Accepted: {', '.join(sorted(VIDEO_EXTENSIONS))}"
+        )
+
+    stride = max(1, stride)
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        raise VideoLoadError(f"Failed to open video: {path}")
+
+    frame_idx = 0
+    try:
+        while True:
+            grabbed = cap.grab()
+            if not grabbed:
+                break
+
+            if frame_idx % stride == 0:
+                ret, frame = cap.retrieve()
+                if ret and frame is not None:
+                    yield frame_idx, frame
+
+            frame_idx += 1
+    finally:
+        cap.release()
+
+    logger.info(
+        "Finished reading video: %d frames iterated, stride=%d",
+        frame_idx,
+        stride,
+    )
