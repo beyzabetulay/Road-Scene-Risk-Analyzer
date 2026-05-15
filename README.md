@@ -111,6 +111,7 @@ See `src/config.py` for available configuration options.
 |----------|-------------|
 | [Architecture](docs/architecture.md) | Pipeline modules, data flow, configuration, and technology choices |
 | [Risk Model](docs/risk_model.md) | Heuristic scoring formula, thresholds, worked example, and limitations |
+| [Demo Scenarios](docs/demo_scenarios.md) | Expected behavior for low, medium, and high-risk road scenes |
 | [Data Strategy](docs/data_strategy.md) | Accepted input formats, sample data sources, why COCO-pretrained detection is used, and what is explicitly excluded. |
 
 ---

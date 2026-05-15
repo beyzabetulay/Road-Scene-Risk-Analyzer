@@ -82,6 +82,19 @@ st.markdown(
     """
 )
 
+with st.expander("📖 How does this work? (Demo Scenarios & Logic)"):
+    st.markdown(
+        """
+        **The system evaluates risk based on 2D heuristics:**
+        - 🟢 **LOW Risk**: Vehicles are far away, outside the blue Danger Zone, and occupy a small portion of the screen.
+        - 🟡 **MEDIUM Risk**: A vehicle is close to the driving lane, or a large vehicle (bus/truck) is blocking visibility, but your immediate path is clear.
+        - 🔴 **HIGH Risk**: A vulnerable user (pedestrian/cyclist) or vehicle is directly inside your estimated path (the blue Danger Zone).
+        
+        **Limitations:**
+        This is a computer-vision prototype. It lacks real depth sensors (LIDAR/Radar) and relies entirely on 2D bounding box sizes and Y-coordinates to guess proximity. It does not track velocity (Time-To-Collision) and assumes a straight driving path.
+        """
+    )
+
 # Sidebar settings
 with st.sidebar:
     st.header("⚙️ Settings")
