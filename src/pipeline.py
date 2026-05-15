@@ -137,13 +137,22 @@ def analyze_image(
     detector = _get_detector(model_name, confidence_threshold)
     detections: list[Detection] = detector.detect(image)
 
+    # Risk processing: Danger Zone ────────────────────────────────
+    from src.risk.danger_zone import DangerZone
+    zone = DangerZone(w, h)
+    
+    updated_detections = []
+    for d in detections:
+        is_in_zone = zone.contains_point(d.bottom_center)
+        updated_detections.append(d.with_risk(in_danger_zone=is_in_zone))
+    
     # 3. Package ──────────────────────────────────────────────────
     result = AnalysisResult(
         image_width=w,
         image_height=h,
         channels=c,
-        detections=detections,
-        detection_count=len(detections),
+        detections=updated_detections,
+        detection_count=len(updated_detections),
         timestamp=datetime.now(timezone.utc).isoformat(),
         settings={
             "model_name": model_name,
@@ -248,6 +257,10 @@ def analyze_video(
     )
 
     detector = _get_detector(model_name, confidence_threshold)
+    
+    # Initialize DangerZone for the video resolution
+    from src.risk.danger_zone import DangerZone
+    zone = DangerZone(info.width, info.height)
 
     frame_results: list[VideoFrameResult] = []
     total_read = 0
@@ -255,17 +268,23 @@ def analyze_video(
     for frame_idx, frame in load_video_frames(video_path, stride=stride):
         total_read = frame_idx + 1
         detections = detector.detect(frame)
+        
+        # Risk processing: Danger Zone
+        updated_detections = []
+        for d in detections:
+            is_in_zone = zone.contains_point(d.bottom_center)
+            updated_detections.append(d.with_risk(in_danger_zone=is_in_zone))
 
         # max risk score per frame (will be 0.0 until risk module is wired)
         max_risk = (
-            max(d.risk_score for d in detections) if detections else 0.0
+            max(d.risk_score for d in updated_detections) if updated_detections else 0.0
         )
 
         frame_results.append(
             VideoFrameResult(
                 frame_index=frame_idx,
-                detections=detections,
-                detection_count=len(detections),
+                detections=updated_detections,
+                detection_count=len(updated_detections),
                 max_risk_score=max_risk,
             )
         )
