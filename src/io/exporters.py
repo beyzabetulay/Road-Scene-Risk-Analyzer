@@ -5,16 +5,19 @@ Provides functions to format and export analysis results
 into JSON, CSV, and image byte streams for UI downloads.
 """
 
+from __future__ import annotations
+
 import csv
 import io
 import json
 from datetime import datetime, timezone
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import cv2
 import numpy as np
 
-from src.pipeline import AnalysisResult, VideoAnalysisResult
+if TYPE_CHECKING:
+    from src.pipeline import AnalysisResult, VideoAnalysisResult
 
 
 def generate_export_filename(prefix: str, risk_level: str, ext: str) -> str:
@@ -44,7 +47,7 @@ def export_table_to_csv(result: Union[AnalysisResult, VideoAnalysisResult]) -> s
     output = io.StringIO()
     writer = csv.writer(output)
 
-    if isinstance(result, AnalysisResult):
+    if not hasattr(result, "frame_results"):
         writer.writerow(
             ["Class", "Confidence", "Risk Score", "In Danger Zone", "Reason"]
         )
