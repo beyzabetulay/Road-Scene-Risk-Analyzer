@@ -76,6 +76,9 @@ LANE_MAX_LINE_GAP: int = int(os.getenv("LANE_MAX_LINE_GAP", "50"))
 ENABLE_DEPTH_ESTIMATION: bool = os.getenv("ENABLE_DEPTH_ESTIMATION", "false").lower() == "true"
 DEPTH_MODEL: str = os.getenv("DEPTH_MODEL", "MiDaS_small")
 
+# ── Object Tracking ────────────────────────────────────────────
+ENABLE_OBJECT_TRACKING: bool = os.getenv("ENABLE_OBJECT_TRACKING", "false").lower() == "true"
+
 # ── Accepted Media Formats ─────────────────────────────────────
 IMAGE_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS: set[str] = {".mp4", ".avi"}

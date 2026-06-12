@@ -268,6 +268,7 @@ def analyze_video(
     output_video_path: str | Path | None = None,
     use_lane_detection: bool = False,
     use_depth: bool = False,
+    use_tracking: bool = False,
 ) -> VideoAnalysisResult:
     """Run detection on every *stride*-th frame of a video.
 
@@ -280,6 +281,7 @@ def analyze_video(
         output_video_path:    Optional path to write an annotated MP4 video.
         use_lane_detection:   Whether to use dynamic lane detection for the danger zone.
         use_depth:            Whether to estimate depth for detections using MiDaS.
+        use_tracking:         Whether to enable object tracking across frames.
 
     Returns:
         A :class:`VideoAnalysisResult` with per-frame results and
@@ -334,7 +336,7 @@ def analyze_video(
     try:
         for frame_idx, frame in load_video_frames(video_path, stride=stride):
             total_read = frame_idx + 1
-            detections = detector.detect(frame)
+            detections = detector.detect(frame, persist=use_tracking)
             # Estimate Depth if enabled
             depth_map = None
             if depth_estimator is not None:

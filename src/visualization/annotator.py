@@ -83,8 +83,11 @@ def annotate_image(
         # Bounding box
         cv2.rectangle(canvas, (x1, y1), (x2, y2), color, thickness)
         
-        # Label text: "class (conf) - risk"
-        label = f"{det.class_name.upper()} ({det.confidence:.2f}) | Risk: {det.risk_score:.0f}"
+        # Label text: "[ID] class (conf) - risk"
+        if det.track_id is not None:
+            label = f"[{det.track_id}] {det.class_name.upper()} ({det.confidence:.2f}) | Risk: {det.risk_score:.0f}"
+        else:
+            label = f"{det.class_name.upper()} ({det.confidence:.2f}) | Risk: {det.risk_score:.0f}"
         
         # Text background
         (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)

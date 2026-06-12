@@ -51,11 +51,12 @@ class RoadDetector:
 
     # ── public API ──────────────────────────────────────────────
 
-    def detect(self, image: np.ndarray) -> list[Detection]:
+    def detect(self, image: np.ndarray, persist: bool = False) -> list[Detection]:
         """Run inference on a single image and return filtered detections.
 
         Args:
             image: BGR NumPy array (H, W, 3) as returned by OpenCV.
+            persist: Whether to use object tracking across frames (ByteTrack).
 
         Returns:
             List of :class:`Detection` objects for road-relevant classes
@@ -68,11 +69,20 @@ class RoadDetector:
         frame_h, frame_w = image.shape[:2]
         frame_area = frame_h * frame_w
 
-        results: list[Results] = self.model(
-            image,
-            conf=self.confidence_threshold,
-            verbose=False,
-        )
+        if persist:
+            results: list[Results] = self.model.track(
+                image,
+                conf=self.confidence_threshold,
+                persist=True,
+                tracker="bytetrack.yaml",
+                verbose=False,
+            )
+        else:
+            results: list[Results] = self.model(
+                image,
+                conf=self.confidence_threshold,
+                verbose=False,
+            )
 
         detections: list[Detection] = []
 
@@ -111,6 +121,9 @@ class RoadDetector:
                 continue
 
             confidence = float(box.conf[0])
+            
+            # Extract track ID if available
+            track_id = int(box.id[0]) if box.id is not None else None
 
             x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
             bbox_w = x2 - x1
@@ -130,6 +143,7 @@ class RoadDetector:
                     bbox_area_ratio=round(area_ratio, 6),
                     center=(cx, cy),
                     bottom_center=(cx, y2),
+                    track_id=track_id,
                 )
             )
 

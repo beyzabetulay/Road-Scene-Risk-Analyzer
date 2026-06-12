@@ -136,7 +136,7 @@ with st.sidebar:
     )
     
     st.subheader("Advanced Features")
-    from src.config import ENABLE_LANE_DETECTION, ENABLE_DEPTH_ESTIMATION
+    from src.config import ENABLE_LANE_DETECTION, ENABLE_DEPTH_ESTIMATION, ENABLE_OBJECT_TRACKING
     use_lane_detection = st.toggle(
         "Dynamic Lane Detection",
         value=ENABLE_LANE_DETECTION,
@@ -146,6 +146,11 @@ with st.sidebar:
         "Depth Estimation (MiDaS)",
         value=ENABLE_DEPTH_ESTIMATION,
         help="Use MiDaS model to estimate object distance and improve risk scoring.",
+    )
+    use_tracking = st.toggle(
+        "Object Tracking (ByteTrack)",
+        value=ENABLE_OBJECT_TRACKING,
+        help="Maintain object identity across video frames.",
     )
 
 # Compute custom danger zone coordinates
@@ -264,6 +269,7 @@ if uploaded_file is not None:
                         output_video_path=output_video_path,
                         use_lane_detection=use_lane_detection,
                         use_depth=use_depth,
+                        use_tracking=use_tracking,
                     )
                     
                     # Show Summary Metrics

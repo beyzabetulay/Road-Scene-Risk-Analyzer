@@ -49,6 +49,9 @@ class Detection:
     # Populated by the depth estimation module if enabled
     estimated_depth: float = field(default=0.0)
 
+    # Populated by the tracking module if enabled
+    track_id: int | None = field(default=None)
+
     # ── helpers ─────────────────────────────────────────────────
 
     def with_risk(
@@ -58,6 +61,7 @@ class Detection:
         risk_score: float | None = None,
         risk_reason: str | None = None,
         estimated_depth: float | None = None,
+        track_id: int | None = None,
     ) -> Detection:
         """Return a new Detection with updated risk fields.
 
@@ -75,6 +79,8 @@ class Detection:
             data["risk_reason"] = risk_reason
         if estimated_depth is not None:
             data["estimated_depth"] = estimated_depth
+        if track_id is not None:
+            data["track_id"] = track_id
         return Detection(**data)
 
     def to_dict(self) -> dict:
