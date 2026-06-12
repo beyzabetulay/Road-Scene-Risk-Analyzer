@@ -102,21 +102,18 @@ def analyze_image(
     confidence_threshold: float = CONFIDENCE_THRESHOLD,
     source_name: str = "",
     danger_zone_params: DangerZoneParams | None = None,
+    use_depth: bool = False,
 ) -> AnalysisResult:
-    """Run the full image analysis pipeline.
-
-    Steps:
-        1. Load the image into a BGR NumPy array.
-        2. Run YOLO detection through :class:`RoadDetector`.
-        3. Package results into an :class:`AnalysisResult`.
+    """Run detection on a single image and return results.
 
     Args:
-        image_input:          Anything accepted by :func:`load_image`
+        image_input:          The image to process
                               (path, bytes, file-like, or ndarray).
         model_name:           YOLO model to use (default from config).
         confidence_threshold: Minimum detection confidence (default from config).
         source_name:          Optional label for the input (e.g. filename).
         danger_zone_params:   Optional danger zone parameters.
+        use_depth:            Whether to estimate depth for detections using MiDaS.
 
     Returns:
         An :class:`AnalysisResult` containing image metadata, detections,
@@ -150,10 +147,23 @@ def analyze_image(
     from src.risk.danger_zone import DangerZone, DangerZoneParams
     zone = DangerZone(w, h, params=danger_zone_params)
     
+    # Estimate Depth if enabled ───────────────────────────────────
+    depth_map = None
+    if use_depth:
+        from src.depth.estimator import DepthEstimator
+        from src.config import DEPTH_MODEL
+        depth_estimator = DepthEstimator(model_type=DEPTH_MODEL)
+        depth_map = depth_estimator.estimate(image)
+    
     updated_detections = []
     for d in detections:
         is_in_zone = zone.contains_point(d.bottom_center)
-        temp_d = d.with_risk(in_danger_zone=is_in_zone)
+        
+        est_depth = 0.0
+        if depth_map is not None:
+            est_depth = DepthEstimator.get_depth_at_point(depth_map, d.center)
+            
+        temp_d = d.with_risk(in_danger_zone=is_in_zone, estimated_depth=est_depth)
         score = calculate_object_risk(temp_d, h)
         reason = get_risk_reason(temp_d)
         updated_detections.append(
@@ -257,6 +267,7 @@ def analyze_video(
     danger_zone_params: DangerZoneParams | None = None,
     output_video_path: str | Path | None = None,
     use_lane_detection: bool = False,
+    use_depth: bool = False,
 ) -> VideoAnalysisResult:
     """Run detection on every *stride*-th frame of a video.
 
@@ -268,6 +279,7 @@ def analyze_video(
         danger_zone_params:   Optional danger zone parameters.
         output_video_path:    Optional path to write an annotated MP4 video.
         use_lane_detection:   Whether to use dynamic lane detection for the danger zone.
+        use_depth:            Whether to estimate depth for detections using MiDaS.
 
     Returns:
         A :class:`VideoAnalysisResult` with per-frame results and
@@ -303,6 +315,13 @@ def analyze_video(
             max_line_gap=LANE_MAX_LINE_GAP,
         )
 
+    # Initialize DepthEstimator if enabled
+    depth_estimator = None
+    if use_depth:
+        from src.depth.estimator import DepthEstimator
+        from src.config import DEPTH_MODEL
+        depth_estimator = DepthEstimator(model_type=DEPTH_MODEL)
+
     frame_results: list[VideoFrameResult] = []
     total_read = 0
     
@@ -316,6 +335,10 @@ def analyze_video(
         for frame_idx, frame in load_video_frames(video_path, stride=stride):
             total_read = frame_idx + 1
             detections = detector.detect(frame)
+            # Estimate Depth if enabled
+            depth_map = None
+            if depth_estimator is not None:
+                depth_map = depth_estimator.estimate(frame)
             
             # Update Danger Zone dynamically if enabled
             current_zone = static_zone
@@ -328,7 +351,13 @@ def analyze_video(
             updated_detections = []
             for d in detections:
                 is_in_zone = current_zone.contains_point(d.bottom_center)
-                temp_d = d.with_risk(in_danger_zone=is_in_zone)
+                
+                est_depth = 0.0
+                if depth_map is not None:
+                    # Use center point for depth lookup
+                    est_depth = DepthEstimator.get_depth_at_point(depth_map, d.center)
+                    
+                temp_d = d.with_risk(in_danger_zone=is_in_zone, estimated_depth=est_depth)
                 score = calculate_object_risk(temp_d, info.height)
                 reason = get_risk_reason(temp_d)
                 updated_detections.append(

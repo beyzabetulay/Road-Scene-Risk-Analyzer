@@ -72,6 +72,10 @@ LANE_HOUGH_THRESHOLD: int = int(os.getenv("LANE_HOUGH_THRESHOLD", "50"))
 LANE_MIN_LINE_LENGTH: int = int(os.getenv("LANE_MIN_LINE_LENGTH", "100"))
 LANE_MAX_LINE_GAP: int = int(os.getenv("LANE_MAX_LINE_GAP", "50"))
 
+# ── Depth Estimation ───────────────────────────────────────────
+ENABLE_DEPTH_ESTIMATION: bool = os.getenv("ENABLE_DEPTH_ESTIMATION", "false").lower() == "true"
+DEPTH_MODEL: str = os.getenv("DEPTH_MODEL", "MiDaS_small")
+
 # ── Accepted Media Formats ─────────────────────────────────────
 IMAGE_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS: set[str] = {".mp4", ".avi"}

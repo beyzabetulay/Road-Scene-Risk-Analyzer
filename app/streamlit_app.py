@@ -136,11 +136,16 @@ with st.sidebar:
     )
     
     st.subheader("Advanced Features")
-    from src.config import ENABLE_LANE_DETECTION
+    from src.config import ENABLE_LANE_DETECTION, ENABLE_DEPTH_ESTIMATION
     use_lane_detection = st.toggle(
         "Dynamic Lane Detection",
         value=ENABLE_LANE_DETECTION,
         help="Use OpenCV to dynamically detect lane lines and adjust the Danger Zone.",
+    )
+    use_depth = st.toggle(
+        "Depth Estimation (MiDaS)",
+        value=ENABLE_DEPTH_ESTIMATION,
+        help="Use MiDaS model to estimate object distance and improve risk scoring.",
     )
 
 # Compute custom danger zone coordinates
@@ -176,6 +181,7 @@ if uploaded_file is not None:
                         confidence_threshold=conf_thresh,
                         source_name=uploaded_file.name,
                         danger_zone_params=dz_params,
+                        use_depth=use_depth,
                     )
                     
                     # Read original image to pass to annotator
@@ -257,6 +263,7 @@ if uploaded_file is not None:
                         danger_zone_params=dz_params,
                         output_video_path=output_video_path,
                         use_lane_detection=use_lane_detection,
+                        use_depth=use_depth,
                     )
                     
                     # Show Summary Metrics
