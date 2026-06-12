@@ -260,6 +260,13 @@ if uploaded_file is not None:
                         
                     # VIDEO ANALYSIS
                     output_video_path = tmp_path + "_annotated.mp4"
+                    
+                    progress_bar = st.progress(0, text="Starting video analysis...")
+                    
+                    def update_progress(current: int, total: int):
+                        progress = min(current / max(total, 1), 1.0)
+                        progress_bar.progress(progress, text=f"Analyzing video: Frame {current} of {total}")
+
                     result = analyze_video(
                         tmp_path,
                         stride=stride,
@@ -270,7 +277,10 @@ if uploaded_file is not None:
                         use_lane_detection=use_lane_detection,
                         use_depth=use_depth,
                         use_tracking=use_tracking,
+                        progress_callback=update_progress,
                     )
+                    
+                    progress_bar.empty()
                     
                     # Show Summary Metrics
                     st.subheader("📊 Video Analysis Summary")
