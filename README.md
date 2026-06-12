@@ -118,13 +118,29 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 
 ## 🚀 Installation
 
-### Prerequisites
+### Option 1: Docker (Recommended)
+
+The easiest way to run the analyzer without managing Python dependencies is via Docker.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/beyzabetulay/Road-Scene-Risk-Analyzer.git
+cd Road-Scene-Risk-Analyzer
+
+# 2. Run with Docker Compose
+docker compose up --build
+```
+The dashboard will be available at `http://localhost:8501`.
+
+### Option 2: Local Python Environment
+
+#### Prerequisites
 
 - **Python 3.10+**
 - **pip** package manager
 - ~200 MB disk space (for YOLOv8 nano weights, auto-downloaded on first run)
 
-### Step-by-Step Setup
+#### Step-by-Step Setup
 
 ```bash
 # 1. Clone the repository

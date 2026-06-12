@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Model weights (will be downloaded at runtime)
+*.pt
+*.onnx
+*.engine
+
+# Data outputs (keep sample inputs if needed, but exclude outputs)
+data/outputs/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tests
+.pytest_cache/
+test_*.jpg
+test_*.png
+test_*.mp4
+test_sonucu*.jpg
