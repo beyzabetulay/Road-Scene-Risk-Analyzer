@@ -11,7 +11,7 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, Callable
 
 import numpy as np
 
@@ -80,32 +80,19 @@ class AnalysisResult:
 # Module-level detector instance (lazy-loaded).
 _detector: RoadDetector | None = None
 
-    """Result of analyzing a single image.
 
-    Attributes:
-        image_metadata: Details about the input image (width, height, etc).
-        detections:     List of detected and scored objects.
-        timestamp:      ISO 8601 timestamp of when analysis completed.
-        settings:       The settings used for this analysis.
-    """
-
-    image_metadata: dict[str, Any]
-    detections: list[Detection]
-    timestamp: str
-    settings: dict[str, Any]
-    scene_risk: Any = field(default=None)  # Type is SceneRiskResult
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the entire result to a JSON-friendly dictionary."""
-        d = asdict(self)
-        if self.scene_risk is not None:
-            # handle scene_risk serialization manually
-            from src.risk.scene_classifier import SceneRiskResult
-
-            # We know it's a SceneRiskResult or dict
-            if isinstance(self.scene_risk, SceneRiskResult):
-                d["scene_risk"] = self.scene_risk.to_dict()
-        return d
+def _get_detector(
+    model_name: str = YOLO_MODEL,
+    confidence_threshold: float = CONFIDENCE_THRESHOLD,
+) -> RoadDetector:
+    """Return a shared detector, creating it on first call."""
+    global _detector  # noqa: PLW0603
+    if _detector is None:
+        _detector = RoadDetector(
+            model_name=model_name,
+            confidence_threshold=confidence_threshold,
+        )
+    return _detector
 
 
 def analyze_image(
@@ -144,12 +131,20 @@ def analyze_image(
     if not source_name and isinstance(image_input, (str, Path)):
         source_name = Path(image_input).name
 
+    logger.info(
+        "Analyzing image '%s' (%dx%d, %d channels)",
+        source_name or "<upload>",
+        w,
+        h,
+        c,
+    )
+
     # 2. Detect ───────────────────────────────────────────────────
     detector = _get_detector(model_name, confidence_threshold)
     detections: list[Detection] = detector.detect(image)
 
     # Risk processing: Danger Zone ────────────────────────────────
-    from src.risk.danger_zone import DangerZone
+    from src.risk.danger_zone import DangerZone, DangerZoneParams
     zone = DangerZone(w, h, params=danger_zone_params)
     
     # Estimate Depth if enabled ───────────────────────────────────
@@ -174,79 +169,93 @@ def analyze_image(
         updated_detections.append(
             temp_d.with_risk(risk_score=score, risk_reason=reason)
         )
-    detections = updated_detections
-
-    # 3. Classify Scene ───────────────────────────────────────────
-    from src.risk.scene_classifier import classify_scene
-
-    scene_risk = classify_scene(detections)
-
-    # 4. Package Results ──────────────────────────────────────────
+        
+    scene_risk = classify_scene(updated_detections)
+    
+    # 3. Package ──────────────────────────────────────────────────
     result = AnalysisResult(
-        image_metadata={
-            "source_name": source_name,
-            "width": w,
-            "height": h,
-            "channels": c,
-        },
-        detections=detections,
+        image_width=w,
+        image_height=h,
+        channels=c,
+        detections=updated_detections,
+        detection_count=len(updated_detections),
         scene_risk=scene_risk,
         timestamp=datetime.now(timezone.utc).isoformat(),
         settings={
             "model_name": model_name,
             "confidence_threshold": confidence_threshold,
-            "danger_zone_params": asdict(zone.params),
+            "target_classes": list(detector.target_classes),
         },
+        source_name=source_name,
     )
 
-    logger.info("Analysis complete: found %d objects.", len(detections))
+    logger.info(
+        "Analysis complete: %d detection(s) found.",
+        result.detection_count,
+    )
     return result
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ── Video Analysis ───────────────────────────────────────────────────────────
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Video analysis ──────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
+@dataclass
 class VideoFrameResult:
-    """Result of analyzing a single video frame."""
+    """Detection result for a single processed video frame.
+
+    Attributes:
+        frame_index:     Original frame index in the video.
+        detections:      List of Detection objects for this frame.
+        detection_count: Number of detections in this frame.
+        max_risk_score:  Highest object-level risk score (0 before risk scoring).
+    """
 
     frame_index: int
-    time_sec: float
     detections: list[Detection]
-    scene_risk: Any  # Type is SceneRiskResult
+    detection_count: int
+    max_risk_score: float
+    scene_risk_level: str
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-friendly dictionary."""
-        d = asdict(self)
-        if self.scene_risk is not None:
-            d["scene_risk"] = self.scene_risk.to_dict()
-        return d
+        return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass
 class VideoAnalysisResult:
-    """Result of analyzing an entire video.
+    """Aggregate result of analysing a video file.
 
     Attributes:
-        video_info:           Metadata about the input video.
-        frames:               Analysis results per processed frame.
-        max_scene_risk:       The highest risk score seen across all frames.
-        high_risk_frames:     Number of frames classified as HIGH risk.
-        riskiest_frame_index: Index of the frame with the max score.
-        timestamp:            ISO 8601 timestamp of when analysis completed.
-        settings:             The settings used for this analysis.
+        video_info:          Metadata about the source video.
+        frame_stride:        How many frames were skipped between processed frames.
+        frame_results:       Per-frame detection results.
+        total_frames_read:   Total frames iterated (including skipped).
+        frames_processed:    Number of frames actually analysed.
+        max_scene_risk:      Highest per-frame max risk score across all frames.
+        avg_object_count:    Average number of detections per processed frame.
+        high_risk_frames:    Number of frames whose max risk score >= HIGH threshold.
+        riskiest_frame_index: Frame index with the highest max risk score (-1 if none).
+        timestamp:           ISO-8601 UTC timestamp of when the analysis completed.
+        settings:            Configuration values used for this run.
+        annotated_video_path: Optional path to the generated annotated video file.
     """
 
-    video_info: dict[str, Any]
-    frames: list[VideoFrameResult]
+    video_info: VideoInfo
+    frame_stride: int
+    frame_results: list[VideoFrameResult]
+    total_frames_read: int
+    frames_processed: int
     max_scene_risk: float
+    avg_object_count: float
     high_risk_frames: int
     riskiest_frame_index: int
     timestamp: str
     settings: dict[str, Any]
     annotated_video_path: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the entire result to a JSON-friendly dictionary."""
+        return asdict(self)
 
 
 def analyze_video(
@@ -371,10 +380,8 @@ def analyze_video(
             )
             
             if writer is not None:
-                from src.visualization.annotator import annotate_image
-                # The annotator works on both single images and video frames
-                ann_frame = annotate_image(
-                    frame.copy(),
+                ann_frame = annotate_video_frame(
+                    frame,
                     updated_detections,
                     scene_risk,
                     danger_zone=current_zone,
