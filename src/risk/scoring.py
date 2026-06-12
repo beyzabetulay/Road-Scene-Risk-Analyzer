@@ -33,9 +33,16 @@ def calculate_object_risk(detection: Detection, frame_height: int) -> float:
     score = 0.0
 
     # 1. Proximity Component (0-35)
-    # Area ratio (larger objects are usually closer).
-    # Typical ratio is very small (e.g. 0.01 to 0.3).
-    area_factor = min(detection.bbox_area_ratio * 100, 20.0)  # max 20 points
+    
+    # If depth estimation is available, use it primarily for proximity (max 25 points)
+    # Higher depth value means closer object (range 0.0-1.0)
+    if detection.estimated_depth > 0:
+        depth_factor = min(detection.estimated_depth * 25.0, 25.0)
+        area_factor = 0.0 # Depth is more reliable, override area
+    else:
+        # Fallback to Area ratio (larger objects are usually closer).
+        depth_factor = 0.0
+        area_factor = min(detection.bbox_area_ratio * 100, 20.0)  # max 20 points
     
     # Y position (objects lower in the frame are closer).
     # y2 is the bottom of the bounding box.
@@ -43,7 +50,9 @@ def calculate_object_risk(detection: Detection, frame_height: int) -> float:
     y_ratio = y2 / frame_height if frame_height > 0 else 0.0
     y_factor = min(y_ratio * 15.0, 15.0)  # max 15 points
     
-    score += area_factor + y_factor
+    # Normalize score so it's roughly consistent with the old max of 35
+    proximity_score = area_factor + depth_factor + y_factor
+    score += min(proximity_score, 35.0)
 
     # 2. Danger Zone Component (+30)
     if detection.in_danger_zone:

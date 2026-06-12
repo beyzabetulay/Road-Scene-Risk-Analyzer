@@ -45,6 +45,9 @@ class Detection:
     in_danger_zone: bool = field(default=False)
     risk_score: float = field(default=0.0)
     risk_reason: str = field(default="")
+    
+    # Populated by the depth estimation module if enabled
+    estimated_depth: float = field(default=0.0)
 
     # ── helpers ─────────────────────────────────────────────────
 
@@ -54,6 +57,7 @@ class Detection:
         in_danger_zone: bool | None = None,
         risk_score: float | None = None,
         risk_reason: str | None = None,
+        estimated_depth: float | None = None,
     ) -> Detection:
         """Return a new Detection with updated risk fields.
 
@@ -69,6 +73,8 @@ class Detection:
             data["risk_score"] = risk_score
         if risk_reason is not None:
             data["risk_reason"] = risk_reason
+        if estimated_depth is not None:
+            data["estimated_depth"] = estimated_depth
         return Detection(**data)
 
     def to_dict(self) -> dict:
