@@ -1,0 +1,4 @@
+Class,Confidence,Risk Score,In Danger Zone,Reason
+person,0.9100,82.05,True,Vulnerable user in driving lane
+car,0.8700,24.10,False,Object detected (outside lane)
+car,0.6500,10.45,False,Object detected (outside lane)

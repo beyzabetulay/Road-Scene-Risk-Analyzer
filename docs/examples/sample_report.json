@@ -1,0 +1,63 @@
+{
+  "image_width": 1280,
+  "image_height": 720,
+  "channels": 3,
+  "detections": [
+    {
+      "class_name": "person",
+      "confidence": 0.91,
+      "bbox_xyxy": [510, 280, 610, 520],
+      "bbox_width": 100,
+      "bbox_height": 240,
+      "bbox_area_ratio": 0.026,
+      "center": [560, 400],
+      "bottom_center": [560, 520],
+      "in_danger_zone": true,
+      "risk_score": 82.05,
+      "risk_reason": "Vulnerable user in driving lane"
+    },
+    {
+      "class_name": "car",
+      "confidence": 0.87,
+      "bbox_xyxy": [800, 350, 1000, 450],
+      "bbox_width": 200,
+      "bbox_height": 100,
+      "bbox_area_ratio": 0.022,
+      "center": [900, 400],
+      "bottom_center": [900, 450],
+      "in_danger_zone": false,
+      "risk_score": 24.1,
+      "risk_reason": "Object detected (outside lane)"
+    },
+    {
+      "class_name": "car",
+      "confidence": 0.65,
+      "bbox_xyxy": [200, 320, 350, 400],
+      "bbox_width": 150,
+      "bbox_height": 80,
+      "bbox_area_ratio": 0.013,
+      "center": [275, 360],
+      "bottom_center": [275, 400],
+      "in_danger_zone": false,
+      "risk_score": 10.45,
+      "risk_reason": "Object detected (outside lane)"
+    }
+  ],
+  "detection_count": 3,
+  "scene_risk": {
+    "risk_level": "HIGH",
+    "max_risk_score": 82.05,
+    "reason": "CRITICAL: Person inside estimated driving lane!",
+    "class_counts": {
+      "person": 1,
+      "car": 2
+    }
+  },
+  "timestamp": "2026-06-12T08:30:00.000000+00:00",
+  "settings": {
+    "model_name": "yolov8n.pt",
+    "confidence_threshold": 0.25,
+    "target_classes": ["person", "bicycle", "car", "motorcycle", "bus", "truck", "traffic light", "stop sign"]
+  },
+  "source_name": "dashcam_frame_001.jpg"
+}
