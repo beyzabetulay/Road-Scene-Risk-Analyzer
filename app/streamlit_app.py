@@ -192,7 +192,7 @@ if uploaded_file is not None:
                     # Read original image to pass to annotator
                     image_bgr = cv2.imread(tmp_path)
                     annotated_bgr = annotate_image(
-                        image_bgr, result, draw_danger_zone=draw_zone
+                        image_bgr, result, danger_zone=draw_zone
                     )
                     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
                     
