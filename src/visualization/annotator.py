@@ -39,14 +39,16 @@ def annotate_image(
     image: np.ndarray,
     result: Any,
     *,
-    draw_danger_zone: bool = True,
+    danger_zone: DangerZone | bool = True,
 ) -> np.ndarray:
     """Annotate an image with detections and scene risk information.
 
     Args:
         image: Original BGR image as a NumPy array.
         result: The AnalysisResult containing detections and scene risk.
-        draw_danger_zone: If True, draws the danger zone polygon overlay.
+        danger_zone: If True, draws the default danger zone polygon overlay.
+                     If a DangerZone instance, draws that specific zone.
+                     If False, skips drawing the zone.
 
     Returns:
         A new NumPy array containing the annotated image. Does not mutate
@@ -57,8 +59,11 @@ def annotate_image(
     h, w = canvas.shape[:2]
 
     # 1. Draw Danger Zone
-    if draw_danger_zone:
-        zone = DangerZone(w, h)
+    if danger_zone:
+        if isinstance(danger_zone, DangerZone):
+            zone = danger_zone
+        else:
+            zone = DangerZone(w, h)
         polygon = zone.get_polygon()
         # Draw translucent filled polygon
         overlay = canvas.copy()
@@ -143,7 +148,7 @@ def annotate_video_frame(
     detections: list[Detection],
     scene_risk: SceneRiskResult,
     *,
-    draw_danger_zone: bool = True,
+    danger_zone: DangerZone | bool = True,
 ) -> np.ndarray:
     """Annotate a single video frame with detections and scene risk.
 
@@ -155,7 +160,8 @@ def annotate_video_frame(
         image: Original BGR image as a NumPy array.
         detections: List of Detection objects for this frame.
         scene_risk: The SceneRiskResult for this frame.
-        draw_danger_zone: If True, draws the danger zone polygon overlay.
+        danger_zone: If True, draws the default danger zone polygon overlay.
+                     If a DangerZone instance, draws that specific zone.
 
     Returns:
         A new NumPy array containing the annotated image.
@@ -165,4 +171,4 @@ def annotate_video_frame(
             self.detections = d
             self.scene_risk = s
 
-    return annotate_image(image, DummyResult(detections, scene_risk), draw_danger_zone=draw_danger_zone)
+    return annotate_image(image, DummyResult(detections, scene_risk), danger_zone=danger_zone)

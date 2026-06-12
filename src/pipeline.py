@@ -256,6 +256,7 @@ def analyze_video(
     confidence_threshold: float = CONFIDENCE_THRESHOLD,
     danger_zone_params: DangerZoneParams | None = None,
     output_video_path: str | Path | None = None,
+    use_lane_detection: bool = False,
 ) -> VideoAnalysisResult:
     """Run detection on every *stride*-th frame of a video.
 
@@ -266,6 +267,7 @@ def analyze_video(
         confidence_threshold: Minimum detection confidence.
         danger_zone_params:   Optional danger zone parameters.
         output_video_path:    Optional path to write an annotated MP4 video.
+        use_lane_detection:   Whether to use dynamic lane detection for the danger zone.
 
     Returns:
         A :class:`VideoAnalysisResult` with per-frame results and
@@ -281,10 +283,25 @@ def analyze_video(
     )
 
     detector = _get_detector(model_name, confidence_threshold)
-    
     # Initialize DangerZone for the video resolution
     from src.risk.danger_zone import DangerZone, DangerZoneParams
-    zone = DangerZone(info.width, info.height, params=danger_zone_params)
+    static_zone = DangerZone(info.width, info.height, params=danger_zone_params)
+    
+    # Initialize LaneDetector if enabled
+    lane_detector = None
+    if use_lane_detection:
+        from src.risk.lane_detector import LaneDetector
+        from src.config import (
+            LANE_CANNY_LOW, LANE_CANNY_HIGH,
+            LANE_HOUGH_THRESHOLD, LANE_MIN_LINE_LENGTH, LANE_MAX_LINE_GAP
+        )
+        lane_detector = LaneDetector(
+            canny_low=LANE_CANNY_LOW,
+            canny_high=LANE_CANNY_HIGH,
+            hough_threshold=LANE_HOUGH_THRESHOLD,
+            min_line_length=LANE_MIN_LINE_LENGTH,
+            max_line_gap=LANE_MAX_LINE_GAP,
+        )
 
     frame_results: list[VideoFrameResult] = []
     total_read = 0
@@ -300,10 +317,17 @@ def analyze_video(
             total_read = frame_idx + 1
             detections = detector.detect(frame)
             
+            # Update Danger Zone dynamically if enabled
+            current_zone = static_zone
+            if lane_detector is not None:
+                poly = lane_detector.get_dynamic_danger_zone(frame)
+                if poly is not None:
+                    current_zone = DangerZone.from_lane_polygon(poly, info.width, info.height)
+            
             # Risk processing: Danger Zone and Scoring
             updated_detections = []
             for d in detections:
-                is_in_zone = zone.contains_point(d.bottom_center)
+                is_in_zone = current_zone.contains_point(d.bottom_center)
                 temp_d = d.with_risk(in_danger_zone=is_in_zone)
                 score = calculate_object_risk(temp_d, info.height)
                 reason = get_risk_reason(temp_d)
@@ -328,7 +352,7 @@ def analyze_video(
                     frame,
                     updated_detections,
                     scene_risk,
-                    draw_danger_zone=True,
+                    danger_zone=current_zone,
                 )
                 writer.write_frame(ann_frame)
     finally:

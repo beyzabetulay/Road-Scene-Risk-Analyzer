@@ -64,6 +64,14 @@ DANGER_ZONE_TOP_RIGHT: tuple[float, float] = (0.65, 0.50)
 DANGER_ZONE_BOTTOM_RIGHT: tuple[float, float] = (0.85, 0.95)
 DANGER_ZONE_BOTTOM_LEFT: tuple[float, float] = (0.15, 0.95)
 
+# ── Dynamic Lane Detection ─────────────────────────────────────
+ENABLE_LANE_DETECTION: bool = os.getenv("ENABLE_LANE_DETECTION", "false").lower() == "true"
+LANE_CANNY_LOW: int = int(os.getenv("LANE_CANNY_LOW", "50"))
+LANE_CANNY_HIGH: int = int(os.getenv("LANE_CANNY_HIGH", "150"))
+LANE_HOUGH_THRESHOLD: int = int(os.getenv("LANE_HOUGH_THRESHOLD", "50"))
+LANE_MIN_LINE_LENGTH: int = int(os.getenv("LANE_MIN_LINE_LENGTH", "100"))
+LANE_MAX_LINE_GAP: int = int(os.getenv("LANE_MAX_LINE_GAP", "50"))
+
 # ── Accepted Media Formats ─────────────────────────────────────
 IMAGE_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS: set[str] = {".mp4", ".avi"}

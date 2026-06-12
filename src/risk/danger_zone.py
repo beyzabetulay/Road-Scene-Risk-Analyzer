@@ -58,10 +58,29 @@ class DangerZone:
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.params = params or DangerZoneParams()
+        self._explicit_polygon: np.ndarray | None = None
         self.polygon = self._compute_polygon()
+
+    @classmethod
+    def from_lane_polygon(cls, polygon: np.ndarray, frame_width: int, frame_height: int) -> DangerZone:
+        """Create a DangerZone from an explicit polygon array.
+        
+        Useful for dynamic lane detection where the polygon is computed
+        per-frame rather than based on static relative params.
+        """
+        instance = cls(frame_width, frame_height)
+        # Reshape to OpenCV expected format if needed
+        if len(polygon.shape) == 2:
+            polygon = polygon.reshape((-1, 1, 2))
+        instance._explicit_polygon = polygon
+        instance.polygon = polygon
+        return instance
 
     def _compute_polygon(self) -> np.ndarray:
         """Convert relative parameter coordinates to absolute pixel coordinates."""
+        if self._explicit_polygon is not None:
+            return self._explicit_polygon
+            
         pts = [
             self.params.bottom_left,
             self.params.top_left,

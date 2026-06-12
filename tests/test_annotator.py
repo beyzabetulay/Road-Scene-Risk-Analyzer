@@ -47,7 +47,7 @@ def test_annotate_image_does_not_mutate():
         settings={},
     )
 
-    annotated = annotate_image(original_image, result, draw_danger_zone=True)
+    annotated = annotate_image(original_image, result, danger_zone=True)
 
     # Output should be the same shape and type
     assert annotated.shape == original_image.shape
@@ -79,5 +79,5 @@ def test_annotate_image_no_scene_risk():
     )
     
     # Should not raise
-    annotated = annotate_image(original_image, result, draw_danger_zone=False)
+    annotated = annotate_image(original_image, result, danger_zone=False)
     assert annotated.shape == original_image.shape

@@ -134,6 +134,14 @@ with st.sidebar:
         value=VIDEO_FRAME_STRIDE,
         help="Process every N-th frame to speed up video analysis.",
     )
+    
+    st.subheader("Advanced Features")
+    from src.config import ENABLE_LANE_DETECTION
+    use_lane_detection = st.toggle(
+        "Dynamic Lane Detection",
+        value=ENABLE_LANE_DETECTION,
+        help="Use OpenCV to dynamically detect lane lines and adjust the Danger Zone.",
+    )
 
 # Compute custom danger zone coordinates
 center_x = 0.5
@@ -248,6 +256,7 @@ if uploaded_file is not None:
                         confidence_threshold=conf_thresh,
                         danger_zone_params=dz_params,
                         output_video_path=output_video_path,
+                        use_lane_detection=use_lane_detection,
                     )
                     
                     # Show Summary Metrics
