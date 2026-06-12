@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
+from typing import Any
 
 from src.config import RISK_THRESHOLD_HIGH, RISK_THRESHOLD_LOW
-from src.pipeline import AnalysisResult
 from src.risk.danger_zone import DangerZone
+from src.detection.schemas import Detection
+from src.risk.scene_classifier import SceneRiskResult
 
 
 # ── Colors (BGR format) ──
@@ -35,7 +37,7 @@ def _get_risk_color(score: float) -> tuple[int, int, int]:
 
 def annotate_image(
     image: np.ndarray,
-    result: AnalysisResult,
+    result: Any,
     *,
     draw_danger_zone: bool = True,
 ) -> np.ndarray:
@@ -135,3 +137,32 @@ def annotate_image(
         )
 
     return canvas
+
+def annotate_video_frame(
+    image: np.ndarray,
+    detections: list[Detection],
+    scene_risk: SceneRiskResult,
+    *,
+    draw_danger_zone: bool = True,
+) -> np.ndarray:
+    """Annotate a single video frame with detections and scene risk.
+
+    This is a lightweight version of `annotate_image` that accepts raw
+    detections and scene risk, avoiding the need to construct a full
+    AnalysisResult object for every frame of a video.
+
+    Args:
+        image: Original BGR image as a NumPy array.
+        detections: List of Detection objects for this frame.
+        scene_risk: The SceneRiskResult for this frame.
+        draw_danger_zone: If True, draws the danger zone polygon overlay.
+
+    Returns:
+        A new NumPy array containing the annotated image.
+    """
+    class DummyResult:
+        def __init__(self, d, s):
+            self.detections = d
+            self.scene_risk = s
+
+    return annotate_image(image, DummyResult(detections, scene_risk), draw_danger_zone=draw_danger_zone)

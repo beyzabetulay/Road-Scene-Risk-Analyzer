@@ -21,6 +21,8 @@ from src.config import (
     VIDEO_FRAME_STRIDE,
     YOLO_MODEL,
 )
+from src.visualization.annotator import annotate_video_frame
+from src.io.video_writer import AnnotatedVideoWriter
 from src.detection.detector import RoadDetector
 from src.detection.schemas import Detection
 from src.io.media_loader import (
@@ -225,6 +227,7 @@ class VideoAnalysisResult:
         riskiest_frame_index: Frame index with the highest max risk score (-1 if none).
         timestamp:           ISO-8601 UTC timestamp of when the analysis completed.
         settings:            Configuration values used for this run.
+        annotated_video_path: Optional path to the generated annotated video file.
     """
 
     video_info: VideoInfo
@@ -238,6 +241,7 @@ class VideoAnalysisResult:
     riskiest_frame_index: int
     timestamp: str
     settings: dict[str, Any]
+    annotated_video_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the entire result to a JSON-friendly dictionary."""
@@ -251,6 +255,7 @@ def analyze_video(
     model_name: str = YOLO_MODEL,
     confidence_threshold: float = CONFIDENCE_THRESHOLD,
     danger_zone_params: DangerZoneParams | None = None,
+    output_video_path: str | Path | None = None,
 ) -> VideoAnalysisResult:
     """Run detection on every *stride*-th frame of a video.
 
@@ -260,6 +265,7 @@ def analyze_video(
         model_name:           YOLO model to use.
         confidence_threshold: Minimum detection confidence.
         danger_zone_params:   Optional danger zone parameters.
+        output_video_path:    Optional path to write an annotated MP4 video.
 
     Returns:
         A :class:`VideoAnalysisResult` with per-frame results and
@@ -282,33 +288,52 @@ def analyze_video(
 
     frame_results: list[VideoFrameResult] = []
     total_read = 0
+    
+    writer: AnnotatedVideoWriter | None = None
+    if output_video_path is not None:
+        effective_fps = info.fps / stride if stride > 1 else info.fps
+        writer = AnnotatedVideoWriter(output_video_path, effective_fps, info.width, info.height)
+        writer.open()
 
-    for frame_idx, frame in load_video_frames(video_path, stride=stride):
-        total_read = frame_idx + 1
-        detections = detector.detect(frame)
-        
-        # Risk processing: Danger Zone and Scoring
-        updated_detections = []
-        for d in detections:
-            is_in_zone = zone.contains_point(d.bottom_center)
-            temp_d = d.with_risk(in_danger_zone=is_in_zone)
-            score = calculate_object_risk(temp_d, info.height)
-            reason = get_risk_reason(temp_d)
-            updated_detections.append(
-                temp_d.with_risk(risk_score=score, risk_reason=reason)
+    try:
+        for frame_idx, frame in load_video_frames(video_path, stride=stride):
+            total_read = frame_idx + 1
+            detections = detector.detect(frame)
+            
+            # Risk processing: Danger Zone and Scoring
+            updated_detections = []
+            for d in detections:
+                is_in_zone = zone.contains_point(d.bottom_center)
+                temp_d = d.with_risk(in_danger_zone=is_in_zone)
+                score = calculate_object_risk(temp_d, info.height)
+                reason = get_risk_reason(temp_d)
+                updated_detections.append(
+                    temp_d.with_risk(risk_score=score, risk_reason=reason)
+                )
+
+            scene_risk = classify_scene(updated_detections)
+
+            frame_results.append(
+                VideoFrameResult(
+                    frame_index=frame_idx,
+                    detections=updated_detections,
+                    detection_count=len(updated_detections),
+                    max_risk_score=scene_risk.max_risk_score,
+                    scene_risk_level=scene_risk.risk_level,
+                )
             )
-
-        scene_risk = classify_scene(updated_detections)
-
-        frame_results.append(
-            VideoFrameResult(
-                frame_index=frame_idx,
-                detections=updated_detections,
-                detection_count=len(updated_detections),
-                max_risk_score=scene_risk.max_risk_score,
-                scene_risk_level=scene_risk.risk_level,
-            )
-        )
+            
+            if writer is not None:
+                ann_frame = annotate_video_frame(
+                    frame,
+                    updated_detections,
+                    scene_risk,
+                    draw_danger_zone=True,
+                )
+                writer.write_frame(ann_frame)
+    finally:
+        if writer is not None:
+            writer.close()
 
     # ── Aggregate summary ────────────────────────────────────────
     frames_processed = len(frame_results)
@@ -349,6 +374,7 @@ def analyze_video(
             "frame_stride": stride,
             "target_classes": list(detector.target_classes),
         },
+        annotated_video_path=str(output_video_path) if output_video_path else None,
     )
 
     logger.info(

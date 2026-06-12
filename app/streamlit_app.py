@@ -239,14 +239,15 @@ if uploaded_file is not None:
                         mime="text/csv",
                     )
                         
-                else:
                     # VIDEO ANALYSIS
+                    output_video_path = tmp_path + "_annotated.mp4"
                     result = analyze_video(
                         tmp_path,
                         stride=stride,
                         model_name=model_name,
                         confidence_threshold=conf_thresh,
                         danger_zone_params=dz_params,
+                        output_video_path=output_video_path,
                     )
                     
                     # Show Summary Metrics
@@ -313,13 +314,13 @@ if uploaded_file is not None:
 
                     # ── Video Downloads ──
                     st.subheader("💾 Export Results")
-                    dl_col1, dl_col2 = st.columns(2)
+                    dl_col1, dl_col2, dl_col3 = st.columns(3)
                     
                     # 1. JSON
                     json_str = export_report_to_json(result)
                     json_name = generate_export_filename("video_report", overall_risk_level, ".json")
                     dl_col1.download_button(
-                        label="📄 Download Video JSON",
+                        label="📄 Download JSON",
                         data=json_str,
                         file_name=json_name,
                         mime="application/json",
@@ -329,16 +330,33 @@ if uploaded_file is not None:
                     csv_str = export_table_to_csv(result)
                     csv_name = generate_export_filename("video_detections", overall_risk_level, ".csv")
                     dl_col2.download_button(
-                        label="📊 Download Video CSV",
+                        label="📊 Download CSV",
                         data=csv_str,
                         file_name=csv_name,
                         mime="text/csv",
                     )
+                    
+                    # 3. Annotated Video
+                    if result.annotated_video_path and os.path.exists(result.annotated_video_path):
+                        with open(result.annotated_video_path, "rb") as f:
+                            video_bytes = f.read()
+                        
+                        video_name = generate_export_filename("video_annotated", overall_risk_level, ".mp4")
+                        dl_col3.download_button(
+                            label="🎥 Download Video",
+                            data=video_bytes,
+                            file_name=video_name,
+                            mime="video/mp4",
+                        )
+                        st.subheader("▶️ Play Annotated Video")
+                        st.video(video_bytes)
 
             except Exception as e:
                 st.error(f"Analysis failed: {str(e)}")
                 
             finally:
-                # Cleanup temp file
+                # Cleanup temp files
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
+                if 'output_video_path' in locals() and os.path.exists(output_video_path):
+                    os.remove(output_video_path)
