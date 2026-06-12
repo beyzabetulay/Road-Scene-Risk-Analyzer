@@ -255,9 +255,9 @@ if uploaded_file is not None:
                         label="📊 Download CSV",
                         data=csv_str,
                         file_name=csv_name,
-                        mime="text/csv",
                     )
                         
+                else:
                     # VIDEO ANALYSIS
                     output_video_path = tmp_path + "_annotated.mp4"
                     
